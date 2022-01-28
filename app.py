@@ -96,11 +96,11 @@ def mainView():
         cur.execute(
             "select startort,zielort,status,fahrtkosten,transportmittel.icon,fid from fahrt join transportmittel on fahrt.transportmittel = transportmittel.tid where  maxPlaetze>0")
         result = cur.fetchall()
-        available_rides = process.process_list(result)
+        availabe_rides = process.process_list(result)
 
         cur.close()
         del cur
-        return render_template('main_view.html', booked_trips=booked_trips, available_rides=available_rides)
+        return render_template('main_view.html', booked_trips=booked_trips, availabe_rides=availabe_rides)
     else:
         return redirect(url_for("login"))
 
@@ -192,18 +192,18 @@ def viewDrive(fid):
             elif trip_details[6] != 'offen':
                 error = "This trip has been closed"
             elif seat not in (1, 2) and seat > int(trip_details[4]):
-                error = "Maximum 2 seats can be booked and you can't book more than the available seats"
+                error = "Maximum 2 seats can be booked and you can't book more than the availabe seats"
             elif len(already_booked) > 0:
-                error = 'Multiple bookings for same trip is not allowed'
+                error = 'Multipule bookings for same trip is not allowed'
             else:
                 cur.execute('insert into reservieren (kunde, fahrt, anzPlaetze) values (?,?,?)', (user[0], fid, seat))
                 if cur.rowcount > 0:
                     error = ''
-                    success = 'Booking Successful'
+                    success = 'Booking Successfull'
                 else:
                     error = 'Something went wrong. Booking failed'
 
-            # Updating available seat after booking
+            # Updating availabLe seat after booking
             cur.execute(
                 "select fahrt.fid,fahrt.startort,fahrt.zielort,fahrt.fahrtdatumzeit,fahrt.maxPlaetze,fahrt.fahrtkosten,fahrt.status,fahrt.beschreibung,benutzer.bid, benutzer.email, transportmittel.icon from fahrt join benutzer on fahrt.anbieter=benutzer.bid join transportmittel on fahrt.transportmittel = transportmittel.tid where fahrt.fid=?",
                 (fid,))
@@ -330,6 +330,7 @@ def bonus():
             "select cast(avg(cast((bewertung.rating) as decimal(4,2))) as decimal(4,2)) as avgrating,bewertung.benutzer from bewertung join benutzer on benutzer.bid=bewertung.benutzer group by benutzer order by avgrating  desc fetch first 1 rows only")
         highest_rated_driver = cur.fetchone()
         highest_rated_driver_list = process.make_single_list(highest_rated_driver)
+        bestRides_list = []
         if highest_rated_driver_list:
             cur.execute(
                 "select fahrt.fid, fahrt.startort, fahrt.zielort, benutzer.email, transportmittel.icon from fahrt join benutzer on fahrt.anbieter=benutzer.bid join transportmittel on fahrt.transportmittel=transportmittel.tid where fahrt.status='offen' and fahrt.anbieter=?",
@@ -344,5 +345,5 @@ def bonus():
         return redirect(url_for("login"))
 
 
-if __name__ == '_main_':
+if __name__ == '__main__':
     app.run(debug=True)
