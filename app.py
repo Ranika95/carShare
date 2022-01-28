@@ -96,11 +96,11 @@ def mainView():
         cur.execute(
             "select startort,zielort,status,fahrtkosten,transportmittel.icon,fid from fahrt join transportmittel on fahrt.transportmittel = transportmittel.tid where  maxPlaetze>0")
         result = cur.fetchall()
-        availabe_rides = process.process_list(result)
+        available_rides = process.process_list(result)
 
         cur.close()
         del cur
-        return render_template('main_view.html', booked_trips=booked_trips, availabe_rides=availabe_rides)
+        return render_template('main_view.html', booked_trips=booked_trips, available_rides=available_rides)
     else:
         return redirect(url_for("login"))
 
@@ -192,14 +192,14 @@ def viewDrive(fid):
             elif trip_details[6] != 'offen':
                 error = "This trip has been closed"
             elif seat not in (1, 2) and seat > int(trip_details[4]):
-                error = "Maximum 2 seats can be booked and you can't book more than the availabe seats"
+                error = "Maximum 2 seats can be booked and you can't book more than the available seats"
             elif len(already_booked) > 0:
-                error = 'Multipule bookings for same trip is not allowed'
+                error = 'Multiple bookings for same trip is not allowed'
             else:
                 cur.execute('insert into reservieren (kunde, fahrt, anzPlaetze) values (?,?,?)', (user[0], fid, seat))
                 if cur.rowcount > 0:
                     error = ''
-                    success = 'Booking Successfull'
+                    success = 'Booking Successful'
                 else:
                     error = 'Something went wrong. Booking failed'
 
@@ -231,55 +231,63 @@ def deleteTrip(fid):
     if "ses_user" in session:
         user = session["ses_user"]
         cur = db.connection.cursor()
-        print(fid)
+        message = ''
 
         cur.execute('select * from fahrt where fid=? and anbieter=?', (fid, user[0]))
         result = cur.fetchall()
         delete_require = process.process_list(result)
 
-        if delete_require:
-            cur.execute(
-                "delete from bewertung where fahrt=?", (fid,))
-            cur.execute(
-                "delete from reservation where fahrt=?", (fid,))
-            cur.execute(
-                "delete from fahrt where fahrt=?", (fid,))
-            return redirect(url_for("mainView"))
+        if not delete_require:
+            message = 'You cant delete this trip because you are not the creator'
+        else:
+            if request.method == 'POST':
+                cur.execute("delete from bewertung where fahrt=?", (fid,)),
+                cur.execute("delete from reservieren where fahrt=?", (fid,)),
+                cur.execute("delete from fahrt where fid=? and anbieter=?", (fid, user[0]))
+                return redirect(url_for("mainView"))
         cur.close()
         del cur
-        return render_template('delete_trip.html')
+        return render_template('delete_trip.html', message=message, delete_require=delete_require, fid=fid)
+
     else:
         return redirect(url_for("login"))
 
 
-@app.route('/new-rating', methods=['GET', 'POST'])
-def newRating():
+@app.route('/new-rating/<fid>', methods=['GET', 'POST'])
+def newRating(fid):
     if "ses_user" in session:
         user = session["ses_user"]
         cur = db.connection.cursor()
         message = ''
 
-        if request.method == 'POST':
-            rating = request.form["rating"]
-            review_description = request.form["review"]
-            [date, time] = datetime.split('T')
-            formated_date_time = date + ' ' + ':' + '00'
-            cur_date_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        cur.execute('select * from bewertung where fahrt=? and benutzer=?', (fid, user[0]))
+        result = cur.fetchall()
+        already_rated = process.make_single_list(result)
 
-            if 0:
-                error = "multiple rating is not allowed at the same time "
-            else:
-                cur.execute(
-                    'INSERT INTO bewertung(rating,textnachricht,erstellungsdatum,) VALUES(?,?,?)',
-                    (rating, review_description, formated_date_time, user[0]))
-                return redirect(url_for("viewDrive"))
+        cur.execute('select fid , anbieter from fahrt where fid=? and anbieter=?', (fid, user[0]))
+        result = cur.fetchall()
+        creator_trip = process.process_list(result)
+
+        if creator_trip:
+            message = 'You can not rate your own trip.'
         else:
-            message = ['All asterisk (*) fields and required',
-                       'You must select a value for rating ',
-                       'Multiple rating is not allowed', ]
+            if already_rated:
+                message = 'Multiple ratings are not allowed at the same trip.'
+            else:
+                if request.method == 'POST':
+                    rating = int(request.form["rating"])
+                    review_description = request.form["review"]
+                    if rating is not None and review_description is not None and len(review_description) <= 50:
+                        cur.execute("INSERT INTO bewertung(rating,textnachricht,fahrt,benutzer) VALUES(?,?,?,?)",
+                                    (rating, review_description, fid, user[0]))
+                        return redirect(url_for("viewDrive", fid=fid))
+                    else:
+                        message = 'All asterisk (*) fields and required'
+
         cur.close()
         del cur
-        return render_template('new_rating.html', message=message)
+        return render_template('new_rating.html', message=message, already_rated=already_rated,
+                               creator_trip=creator_trip)
 
     else:
         return redirect(url_for("login"))
@@ -308,6 +316,29 @@ def viewSearch():
         cur.close()
         del cur
         return render_template('view_search.html', error=error, searched_result=searched_result)
+
+    else:
+        return redirect(url_for("login"))
+
+
+@app.route('/bonus', methods=['GET', 'POST'])
+def bonus():
+    if "ses_user" in session:
+        user = session["ses_user"]
+        cur = db.connection.cursor()
+        cur.execute(
+            "select cast(avg(cast((bewertung.rating) as decimal(4,2))) as decimal(4,2)) as avgrating,bewertung.benutzer from bewertung join benutzer on benutzer.bid=bewertung.benutzer group by benutzer order by avgrating  desc fetch first 1 rows only")
+        highest_rated_driver = cur.fetchone()
+        highest_rated_driver_list = process.make_single_list(highest_rated_driver)
+        if highest_rated_driver_list:
+            cur.execute(
+                "select fahrt.fid, fahrt.startort, fahrt.zielort, benutzer.email, transportmittel.icon from fahrt join benutzer on fahrt.anbieter=benutzer.bid join transportmittel on fahrt.transportmittel=transportmittel.tid where fahrt.status='offen' and fahrt.anbieter=?",
+                (highest_rated_driver_list[1],))
+            best_rides = cur.fetchall()
+            bestRides_list = process.process_list(best_rides)
+        cur.close()
+        del cur
+        return render_template('bonus.html', best_rides=bestRides_list, highest_rated_driver=highest_rated_driver_list)
 
     else:
         return redirect(url_for("login"))
