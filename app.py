@@ -96,11 +96,11 @@ def mainView():
         cur.execute(
             "select startort,zielort,status,fahrtkosten,transportmittel.icon,fid from fahrt join transportmittel on fahrt.transportmittel = transportmittel.tid where  maxPlaetze>0")
         result = cur.fetchall()
-        availabe_rides = process.process_list(result)
+        available_rides = process.process_list(result)
 
         cur.close()
         del cur
-        return render_template('main_view.html', booked_trips=booked_trips, availabe_rides=availabe_rides)
+        return render_template('main_view.html', booked_trips=booked_trips, available_rides=available_rides)
     else:
         return redirect(url_for("login"))
 
