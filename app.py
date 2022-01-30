@@ -96,11 +96,11 @@ def mainView():
         cur.execute(
             "select startort,zielort,status,fahrtkosten,transportmittel.icon,fid from fahrt join transportmittel on fahrt.transportmittel = transportmittel.tid where  maxPlaetze>0")
         result = cur.fetchall()
-        availabe_rides = process.process_list(result)
+        available_rides = process.process_list(result)
 
         cur.close()
         del cur
-        return render_template('main_view.html', booked_trips=booked_trips, availabe_rides=availabe_rides)
+        return render_template('main_view.html', booked_trips=booked_trips, available_rides=available_rides)
     else:
         return redirect(url_for("login"))
 
@@ -122,22 +122,22 @@ def newDrive():
 
             date_time = request.form["dateTime"]
             [date, time] = date_time.split('T')
-            formated_date_time = date + ' ' + time + ':' + '00'
+            formatted_date_time = date + ' ' + time + ':' + '00'
             cur_date_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
             if start_from is not None and destination is not None and max_capacity in (
                     1, 2, 3, 4, 5, 6, 7, 8, 9,
                     10) and (cost > 0) and transport is not None and date_time is not None and len(description) <= 50:
-                if cur_date_time > formated_date_time:
+                if cur_date_time > formatted_date_time:
                     message = ['Previous date is not allowed']
                 else:
                     cur.execute(
                         'INSERT INTO fahrt (startort, zielort, fahrtdatumzeit, maxPlaetze, fahrtkosten, anbieter, transportmittel, beschreibung)  VALUES (?,?,?,?,?,?,?,?)',
-                        (start_from, destination, formated_date_time, max_capacity, cost, user[0], transport,
+                        (start_from, destination, formatted_date_time, max_capacity, cost, user[0], transport,
                          description))
                     return redirect(url_for("mainView"))
             else:
-                message = ['All asterisk (*) fileds and required',
+                message = ['All asterisk (*) fields and required',
                            'The allowed value for Maximum Capacity is between 1 and 10',
                            'Cost have to be a greater than 0',
                            'Length of description can not be greater than 50']
@@ -192,18 +192,18 @@ def viewDrive(fid):
             elif trip_details[6] != 'offen':
                 error = "This trip has been closed"
             elif seat not in (1, 2) and seat > int(trip_details[4]):
-                error = "Maximum 2 seats can be booked and you can't book more than the availabe seats"
+                error = "Maximum 2 seats can be booked and you can't book more than the available seats"
             elif len(already_booked) > 0:
-                error = 'Multipule bookings for same trip is not allowed'
+                error = 'Multiple bookings for same trip is not allowed'
             else:
                 cur.execute('insert into reservieren (kunde, fahrt, anzPlaetze) values (?,?,?)', (user[0], fid, seat))
                 if cur.rowcount > 0:
                     error = ''
-                    success = 'Booking Successfull'
+                    success = 'Booking Successful'
                 else:
                     error = 'Something went wrong. Booking failed'
 
-            # Updating availabLe seat after booking
+            # Updating available seat after booking
             cur.execute(
                 "select fahrt.fid,fahrt.startort,fahrt.zielort,fahrt.fahrtdatumzeit,fahrt.maxPlaetze,fahrt.fahrtkosten,fahrt.status,fahrt.beschreibung,benutzer.bid, benutzer.email, transportmittel.icon from fahrt join benutzer on fahrt.anbieter=benutzer.bid join transportmittel on fahrt.transportmittel = transportmittel.tid where fahrt.fid=?",
                 (fid,))
@@ -220,7 +220,7 @@ def viewDrive(fid):
                 available_seat = trip_details[4] - total_reserved[0]
         cur.close()
         del cur
-        return render_template('view_drive.html', trip_details=trip_details, availabe_seat=available_seat, uid=user[0],
+        return render_template('view_drive.html', trip_details=trip_details, available_seat=available_seat, uid=user[0],
                                error=error, success=success, all_ratings=all_ratings, average_rating=average_rating)
     else:
         return redirect(url_for("login"))
