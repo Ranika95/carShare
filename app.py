@@ -191,7 +191,7 @@ def viewDrive(fid):
                 error = "You can't book your own trip"
             elif trip_details[6] != 'offen':
                 error = "This trip has been closed"
-            elif seat not in (1, 2) and seat > int(trip_details[4]):
+            elif seat not in (1, 2) and seat > int(available_seat):
                 error = "Maximum 2 seats can be booked and you can't book more than the available seats"
             elif len(already_booked) > 0:
                 error = 'Multiple bookings for same trip is not allowed'
@@ -303,12 +303,13 @@ def viewSearch():
         if request.method == "POST":
             start_away = request.form["start"]
             end_destination = request.form["end"]
-            date_start = request.form["date"]
+            date = request.form["date"]
+            formatted_date = f"{date}%"
             start = f"%{start_away}%".upper()
             end = f"%{end_destination}%".upper()
             cur.execute(
-                f"select startort,zielort, fahrtkosten, fahrtdatumzeit, transportmittel.icon from fahrt join transportmittel on fahrt.transportmittel = transportmittel.tid  where upper(startort) like ? and upper(zielort) like ?",
-                (start, end)
+                f"select startort,zielort, fahrtkosten, fahrtdatumzeit, transportmittel.icon from fahrt join transportmittel on fahrt.transportmittel = transportmittel.tid  where upper(startort) like ? and upper(zielort) like ? and fahrt.fahrtdatumzeit like ?",
+                (start, end, formatted_date)
             )
             result = cur.fetchall()
             searched_result = process.process_list(result)

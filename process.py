@@ -4,9 +4,7 @@ def process_list(result):
         for item in result:
             k = list(item)
             process_result.append(k)
-        return process_result
-    else:
-        return process_result
+    return process_result
 
 
 def make_single_list(result):
